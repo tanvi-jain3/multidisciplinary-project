@@ -1888,8 +1888,9 @@ public class Arena extends AppCompatActivity {
 
         if (BluetoothService.BluetoothConnectionStatus) {
             // Toast.makeText(this, stringBuilder.toString(), Toast.LENGTH_SHORT).show();
-            byte[] bytes = IRstart.getBytes(Charset.defaultCharset());
-            BluetoothService.write(bytes);
+//            byte[] bytes = IRstart.getBytes(Charset.defaultCharset());
+//            BluetoothService.write(bytes);
+            sendObstacles();
             Toast.makeText(Arena.this, "Obstacles sent", Toast.LENGTH_SHORT).show();
             updateStatusWindow("IR Started");
         } else {
