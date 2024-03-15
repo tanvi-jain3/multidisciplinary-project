@@ -59,7 +59,7 @@ class ScanCommand(Command):
         pass
 
     def convert_to_message(self):
-        return "STM|RPI"
+        return f"P___{self.obj_index}"
 
 class StraightCommand(Command):
     def __init__(self, dist):
@@ -106,8 +106,8 @@ class StraightCommand(Command):
         #     return f"STM|BC{abs(descaled_distance):03}"
         # return f"STM|FC{descaled_distance:03}"
         if self.dist < 0:
-            return f"STM|BC{abs(self.dist):03}"
-        return f"STM|FC{self.dist:03}"
+            return f"SB{((abs(self.dist))//5):03}"
+        return f"SF{((self.dist)//5):03}"
 
 
 class TurnCommand(Command):
@@ -204,13 +204,13 @@ class TurnCommand(Command):
     def convert_to_message(self):
         if self.angle > 0 and not self.rev:
             # This is going forward left.
-            return "STM|FL090"
+            return "LF090"
         elif self.angle > 0 and self.rev:
             # This is going backward right.
-            return "STM|BR090"
+            return "RB090"
         elif self.angle < 0 and not self.rev:
             # This is going forward right.
-            return "STM|FR090"
+            return "RF090"
         else:
             # This is going backward left.
-            return "STM|BL090"
+            return "LB090"

@@ -44,7 +44,8 @@ class Brain:
         perms.sort(key=calc_distance)
         print("Found a simple hamiltonian path:")
         for i, simple in enumerate(perms):
-
+            print("simple: ")
+            print(simple)
             for ob in simple:
                 # print(i, index_list)
                 # print(ob.getIndex())
