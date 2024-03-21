@@ -20,27 +20,8 @@ def main(simulator):
 
     # # Access the values using args
     # arena_idx = args.arena
-
-    index = 0
-    t=3
-
-    i = 0
-    reverse = "STM|BC010"
-    scan = "STM|RPI"
-    forward = "STM|FC010"
-    reverseSecond = "STM|BC010"
-    forwardSecond = "STM|FC030"
-    #obst_list = []
-    image_ids = ["11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
-                 "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
-                 "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40"]
     
     client = None
-
-    # Create a client to send and receive information from the RPi
-    # server = Server("192.168.36.25", 3004)  # 10.27.146 139 | 192.168.13.1
-    # server.start()
-    #client.connect()
 
     # while True:
     try:
@@ -50,63 +31,61 @@ def main(simulator):
 
         # Create a client to connect to the RPi.
 
-        if client is None:
-            print(f"Attempting to connect to {RPI_HOST}:{RPI_PORT}")
-            client = RPiClient(RPI_HOST, RPI_PORT)
-            #  Wait to connect to RPi.
-            while True:
-                try:
-                    client.connect()
-                    break
-                except OSError:
-                    pass
-                except KeyboardInterrupt:
-                    client.close()
-                    sys.exit(1)
-            print("Connected to RPi!\n")
+        # if client is None:
+        #     print(f"Attempting to connect to {RPI_HOST}:{RPI_PORT}")
+        #     client = RPiClient(RPI_HOST, RPI_PORT)
+        #     #  Wait to connect to RPi.
+        #     while True:
+        #         try:
+        #             client.connect()
+        #             break
+        #         except OSError:
+        #             pass
+        #         except KeyboardInterrupt:
+        #             client.close()
+        #             sys.exit(1)
+        #     print("Connected to RPi!\n")
 
-        # # # # Wait for message from RPI
-        print("Waiting to receive data from RPi...")
-        d = client.receive_message()
-        # d = dummy
-        print("Decoding data from RPi:")
-        d = d.decode("utf-8")
+        # # Wait for message from RPI
+        # print("Waiting to receive data from RPi...")
+        # d = client.receive_message()
+        # print("Decoding data from RPi:")
+        # d = d.decode("utf-8")
 
-        print(f'decoded msg: {d}')
+        # print(f'decoded msg: {d}')
 
-        to_return = []
-        if d[0:4] == "ALG:":
-            d = d[4:]
-            d = d.split(";")
-            # now split into separate obstacles
-            # last will be split into empty string therefore ignore
-            for x in range(0, len(d) - 1):
-                d_split = d[x].split(",")
-                # d_split now holds the 4 values that are needed to create one obstacle
-                temp = []
-                for y in range(0, len(d_split)):
-                    # means it's x or y coordinate so multiply by 10 to correspond to correct coordinate
-                    if y <= 1:
-                        temp.append(int(d_split[y]) * 10)
-                    elif y == 2:
-                        if d_split[y] == "N":
-                            temp.append(90)
-                        elif d_split[y] == "S":
-                            temp.append(-90)
-                        elif d_split[y] == "E":
-                            temp.append(0)
-                        else:
-                            temp.append(180)
-                    else:
-                        temp.append(int(d_split[y]))
-                to_return.append(temp)
-                print("to_return: ", to_return)
+        # to_return = []
+        # # input conversion
+        # if d[0:4] == "ALG:":
+        #     d = d[4:]
+        #     d = d.split(";")
+        #     # now split into separate obstacles
+        #     # last will be split into empty string therefore ignore
+        #     for x in range(0, len(d) - 1):
+        #         d_split = d[x].split(",")
+        #         # d_split now holds the 4 values that are needed to create one obstacle
+        #         temp = []
+        #         for y in range(0, len(d_split)):
+        #             # means it's x or y coordinate so multiply by 10 to correspond to correct coordinate
+        #             if y <= 1:
+        #                 temp.append(int(d_split[y]) * 10)
+        #             elif y == 2:
+        #                 if d_split[y] == "N":
+        #                     temp.append(90)
+        #                 elif d_split[y] == "S":
+        #                     temp.append(-90)
+        #                 elif d_split[y] == "E":
+        #                     temp.append(0)
+        #                 else:
+        #                     temp.append(180)
+        #             else:
+        #                 temp.append(int(d_split[y]))
+        #         to_return.append(temp)
+        #         print("to_return: ", to_return)
 
-        obst_list = to_return
+        # obst_list = to_return
 
-        # obst_list.pop()
         print("Received all obstacles data from ANDROID.")
-        # print(f"Obstacles data: {obst_list}")
 
         print("============================Parse Obstacles Data============================")
     #     obst_list_0 =[{"x":2,"y":18,"direction":-90,"obs_id":0},
@@ -135,6 +114,16 @@ def main(simulator):
     #         obst_list = obst_list_1
     #     else:
     #         obst_list = obst_list_2
+        
+        obst_list = [{"x":17,"y":13,"direction":-90,"obs_id":0},
+            {"x":19,"y":18,"direction":180,"obs_id":1},
+            {"x":4,"y":6,"direction":90,"obs_id":2},
+            {"x":5,"y":16,"direction":180,"obs_id":3},
+            {"x":15,"y":8,"direction":0,"obs_id":4},
+            {"x":0,"y":11,"direction":0,"obs_id":5},
+            {"x":12,"y":12,"direction":-90,"obs_id":6},
+            {"x":12,"y":5,"direction":-90,"obs_id":7}
+            ]
 
         obstacles = parse_obstacle_data(obst_list)
         print(f"After parsing: {obstacles}")
@@ -159,116 +148,15 @@ def main(simulator):
         print("Full list of paths commands till last obstacle:")
         print(f"{commands}")
 
-        # translated_commands = saver_bridge(commands)
-
-        # print(f"after translating: {translated_commands}")
-
-        print("Sending list of commands to RPi...")
-        # commands = app.robot.convert_all_commands()
-        # print(translated_commands)
-        if len(commands) != 0:
-            client.send_message(commands)
-        else:
-            print("ERROR!! NO COMMANDS TO SEND TO RPI")
-
-
-
-        # 5,4,3,2,1,0
-
-
-        # print("=======================Send path commands to move to obstacles=======================")
-        # server.send("STM|FC000")
-        # time.sleep(t)
-        # clen =len(commands)
-        # for x ,command in enumerate(commands):
-        #     print(command)
-        #     server.send(command)
-        #     print(f"Sending path commands to move to obstacle {index_list[index]} to RPI to STM...")
-
-        #     if (x<clen-1):
-        #         if (commands[x+1]== 'STM|RPI'):
-        #             if(commands[x]== 'STM|BR090' or commands[x]== 'STM|BL090'or commands[x]== 'STM|FL090' or commands[x]== 'STM|FR090'):
-        #                 time.sleep(3*t)
-        #             else:
-        #                 time.sleep(t)
-        #         else:
-        #             time.sleep(t / 3 * 2)
-        #     else:
-        #         time.sleep(t)
-
-        #     #if(command != "RPI|"):
-        #         #updateRoboPos(roboPosCoor, command)
-        #        # roboUpdateToAndroid = f"AND|ROBOT,<{roboPosCoor['x']//10}>,<{roboPosCoor['y']//10}>,<{roboPosCoor['direction']}>"
-        #         #print("--------")
-        #         #print(roboUpdateToAndroid)
-        #         #server.send(roboUpdateToAndroid)
-        #         #time.sleep(1)
-
-        #     if command == "STM|RPI":
-        #         print("Waiting to receive image_id from STM/IMAGE REC")
-        #         var = server.receive()
-        #         if var in image_ids:
-        #             s = "AND|TARGET,"
-        #             s+=str(index_list[index])
-        #             s+=","
-        #             s+=var
-        #             index+=1
-        #             print(s)
-        #             server.send(s)
-        #         else:
-        #             print("Moving backwards")
-        #             time.sleep(t)
-        #             server.send(reverse)
-        #             print(reverse)
-        #             time.sleep(t)
-        #             server.send(scan)
-        #             print(scan)
-        #             print("Waiting to receive image_id from STM/IMAGE REC")
-        #             var = server.receive()
-
-        #             if var in image_ids:
-        #                 s = "AND|TARGET,"
-        #                 s+=str(index_list[index])
-        #                 s+=","
-        #                 s+=var
-        #                 index+=1
-        #                 print(s)
-        #                 server.send(s)
-        #             print("Moving Forward to offset")
-        #             server.send(forward)
-        #             # time.sleep(t)
-
-
-
+        # print("Sending list of commands to RPi...")
+        # if len(commands) != 0:
+        #     client.send_message(commands)
+        # else:
+        #     print("ERROR!! NO COMMANDS TO SEND TO RPI")
 
     except KeyboardInterrupt:
         client.close()
         sys.exit(1)
-
-def saver_bridge(strings):
-    output = []
-    index = 0
-
-    for string in strings:
-        parts = string.split('|')
-        direction_fb = parts[1][0]  # Extract direction (F, B, R, L)
-        direction_lr = parts[1][1]
-        value = parts[1][2:]     # Extract numeric value
-        
-        if direction_fb == "R":
-            mapped_string = f'P___{index}'
-            index += 1
-        else:
-            if direction_lr == "C":
-                direction_lr = "S"
-                value = int(value) // 5
-                mapped_string = f'{direction_lr}{direction_fb}{value:03}'
-            else:
-                mapped_string = f'{direction_lr}{direction_fb}{value}'
-
-        output.append(mapped_string)
-
-    return output
 
 # Example usage:
 # input_strings = ['STM|FR090', 'STM|FC050', 'STM|FL090', 'STM|FC100', 'STM|FL090', 'STM|RPI', 'STM|BC100', 'STM|BL090', 'STM|BC050', 'STM|BL090', 'STM|BR090', 'STM|RPI', 'STM|BC100', 'STM|FR090', 'STM|FC150', 'STM|BL090', 'STM|BL090', 'STM|BR090', 'STM|RPI', 'STM|FC100', 'STM|BL090', 'STM|BL090', 'STM|BC200', 'STM|BL090', 'STM|RPI', 'STM|BC100', 'STM|FL090', 'STM|FC450', 'STM|FL090', 'STM|BC100', 'STM|BR090', 'STM|RPI', 'STM|FC100', 'STM|BR090', 'STM|RPI', 'STM|BC250', 'STM|BR090', 'STM|BC150', 'STM|BR090', 'STM|BL090', 'STM|RPI', 'STM|BC050', 'STM|FL090', 'STM|FC200', 'STM|FR090', 'STM|FC350', 'STM|BL090', 'STM|RPI']

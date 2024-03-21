@@ -77,7 +77,10 @@ class Brain:
         print("-" * 70)
         print("Starting path computation...")
         simple_hamiltonians, index_lists = self.compute_simple_hamiltonian_path()
-        for i in range(len(simple_hamiltonians)):
+        max_obs_visited_commands = deque()
+        max_obs_visited_count = 0
+        # for i in range(len(simple_hamiltonians)):
+        for i in range(MAX_RETRY):
             not_found = 0
             self.simple_hamiltonian = simple_hamiltonians[i]
             self.commands = deque()
@@ -97,66 +100,45 @@ class Brain:
                     curr = res
                     self.commands.append(ScanCommand(ROBOT_SCAN_TIME, obstacle.index))
             if not_found:
+                scan_count = self.count_scan_commands(self.commands)
+                if scan_count > max_obs_visited_count:
+                    max_obs_visited_count = scan_count
+                    max_obs_visited_commands = self.commands
                 continue
             self.compress_paths()
             print("-" * 70)
 
             return index_list
-        index_list = index_lists[0]
-        self.simple_hamiltonian = simple_hamiltonians[0]
-        self.commands = deque()
-        for obstacle in self.simple_hamiltonian:
-            target = obstacle.get_robot_target_pos()
-            print("-" * 70)
-            print(f"Planning {curr} to {target}")
-            res = ModifiedAStar(self.grid, self, curr, target).start_astar()
-            if res is None:
-                print(f"No path found from {curr} to {obstacle}")
-            else:
-                print("Path found.")
-                curr = res
-                self.commands.append(ScanCommand(ROBOT_SCAN_TIME, obstacle.index))
+        
+        print()
+        print("-" * 70)
+        print("NO COMPLETE PATH FOUND!!!")
+        print("-" * 70)
+        print()
+        
+        # if no path found then fall back to the best path and ignore the inaccessible ones
+        # index_list = index_lists[0]
+        # self.simple_hamiltonian = simple_hamiltonians[0]
+        # self.commands = deque()
+        # for obstacle in self.simple_hamiltonian:
+        #     target = obstacle.get_robot_target_pos()
+        #     print("-" * 70)
+        #     print(f"Planning {curr} to {target}")
+        #     res = ModifiedAStar(self.grid, self, curr, target).start_astar()
+        #     if res is None:
+        #         print(f"No path found from {curr} to {obstacle}")
+        #         print(f"Abandoning {obstacle}!!")
+        #     else:
+        #         print("Path found.")
+        #         curr = res
+        #         self.commands.append(ScanCommand(ROBOT_SCAN_TIME, obstacle.index))
+
+        self.commands = max_obs_visited_commands
+        print("self.commands: ",self.commands)
         self.compress_paths()
         print("-" * 70)
 
         return index_list
-
-
-    # def compute_simple_hamiltonian_path1(self) -> Tuple[Obstacle]:
-
-    #     # Generate all possible permutations for the image obstacles
-    #     perms = list(itertools.permutations(self.grid.obstacles))
-
-    #     index_list = []
-
-    #     # Get the path that has the least distance travelled.
-    #     def calc_path_cost(path):
-    #         # Create all target points, including the start.
-    #         targets = [self.robot.pos.copy()]
-    #         for obstacle in path:
-    #             targets.append(obstacle.get_robot_target_pos())
-    #         dist = 0
-    #         cost = 0
-    #         for i in range(len(targets) - 1):
-    #             inital = ModifiedAStar(self.grid, self, targets[i], targets[i+1])
-    #             res = inital.start_astar()
-    #             if res is None:
-    #                 print(f"No path found from {targets[i]} to {targets[i+1]}")
-    #                 cost = 99999 # choose a large number, so that the algo won't enfavour this path
-    #                 break
-    #             else:
-    #                 cost += inital.getTotalCost()
-    #             current_target_x, current_target_y = targets[i].xy_pygame()
-    #             next_target_x, next_target_y = targets[i+1].xy_pygame()
-    #             dist += math.sqrt(((current_target_x - next_target_x) ** 2) +
-    #                               ((current_target_y - next_target_y) ** 2))
-    #         return dist+cost
-
-    #     simple = min(perms, key=calc_path_cost)
-
-    #     print("Found a simple hamiltonian path:")
-    #     for ob in simple:
-    #         index_list.append(ob.getIndex())
-    #         print(f"{ob}")
-    #     return simple, index_list
-
+    
+    def count_scan_commands(self, deque_instance):
+        return sum(isinstance(item, ScanCommand) for item in deque_instance)
