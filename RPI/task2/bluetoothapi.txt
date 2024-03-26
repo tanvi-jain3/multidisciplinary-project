@@ -1,0 +1,108 @@
+import bluetooth
+import time
+import socket
+
+class BluetoothAPI:
+    def __init__(self):
+        self.MAC_ADDRESS = 'E4:5F:01:55:A6:F3'  # Bluetooth MAC address of the server device
+        self.PORT_NUMBER = 1  # RFCOMM port used for the Bluetooth communication
+        self.READ_BUFFER_SIZE = 5096  # Buffer size for reading incoming messages
+        self.client = None  # Placeholder for the client socket
+        self.server = None  # Placeholder for the server socket
+
+    # Checks if the server or client sockets are not yet established
+    def check_connection(self):
+        return self.client is None or self.server is None
+
+    # Establishes a server socket and waits for a client to connect
+    def connect(self):
+        try:
+            # Closes the existing server socket if it's already open
+            if self.server:
+                self.server.close()
+        except Exception as e:
+            print(f"[BT] Error closing existing server socket: {e}")
+
+        print("[BT] Attempting to establish a Bluetooth connection...")
+        while True:
+            try:
+                # Creates a new server socket using RFCOMM protocol
+                self.server = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+                # Binds the server socket to the specified MAC address and port
+                self.server.bind((self.MAC_ADDRESS, self.PORT_NUMBER))
+                # Listens for incoming connections
+                self.server.listen(1)
+                print("[BT] Server initialized, waiting for connections...")
+                # Accepts an incoming connection, creating a client socket
+                self.client, client_address = self.server.accept()
+                print(f"[BT] Connection established with {client_address}")
+                break  # Exits the loop once a connection is established
+            except Exception as e:
+                print(f"[BT] Connection failed: {e}, retrying...")
+                time.sleep(1)  # Waits for a short period before retrying
+
+    # Sends a message to the connected Bluetooth client
+    def write(self, message):
+        try:
+            # Sends the message through the client socket
+            self.client.send(message)
+            print("[BT] Message sent.")
+        except Exception as e:
+            print(f"[BT] Sending message failed: {e}")
+            return True  # Indicates an error occurred
+        return False  # Indicates successful sending
+
+    # Disconnects both the server and client sockets
+    def disconnect(self):
+        if self.client:
+            try:
+                # Closes the client socket
+                self.client.close()
+                print("[BT] Client socket disconnected.")
+            except Exception as e:
+                print(f"[BT] Failed to disconnect client socket: {e}")
+            self.client = None
+
+        if self.server:
+            try:
+                # Closes the server socket
+                self.server.close()
+                print("[BT] Server socket closed.")
+            except Exception as e:
+                print(f"[BT] Failed to close server socket: {e}")
+            self.server = None
+
+    # Reads a message from the connected client
+    def read(self):
+        if not self.client:
+            print("[BT] No client connected, cannot read.")
+            return None
+
+        try:
+            # Receives a message with the specified buffer size
+            message = self.client.recv(self.READ_BUFFER_SIZE)
+            print(f"[BT] Message received: {message.decode()}")
+            return message  # Returns the received message
+        except Exception as e:
+            print(f"[BT] Reading message failed: {e}")
+            return None
+
+if __name__ == '__main__':
+    bluetooth_api = BluetoothAPI()
+    bluetooth_api.connect()  # Establishes a Bluetooth connection
+    try:
+        while True:
+            # Prompts the user to enter a command
+            command = input("Enter Command (write/read/disconnect/exit): ").lower()
+            if command == 'exit':
+                break  # Exits the loop and ends the program
+            elif command == 'write':
+                message = input("Enter message to send: ")
+                bluetooth_api.write(message.encode())  # Sends the user-entered message
+            elif command == 'read':
+                bluetooth_api.read()  # Reads a message from the Bluetooth client
+            elif command == 'disconnect':
+                bluetooth_api.disconnect()  # Disconnects the Bluetooth connection
+    finally:
+        bluetooth_api.disconnect()  # Ensures disconnection on program exit
+        print("[BT] Exiting...")

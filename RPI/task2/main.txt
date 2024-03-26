@@ -1,0 +1,169 @@
+import time
+import threading
+from bluetoothapi import BluetoothAPI
+from serialapi import SerialAPI
+import RPi.GPIO as GPIO
+import atexit
+import socket
+import imagezmq
+from picamera import PiCamera
+from picamera.array import PiRGBArray
+import cv2
+import numpy as np
+
+class Multithreader:
+    """
+    This class is designed to manage multiple threads for handling Bluetooth communication,
+    serial communication, and image capturing and processing with a PiCamera.
+    """
+    def __init__(self):
+        self.bluetooth_api = BluetoothAPI()
+        self.serial_api = SerialAPI()
+        self.image_sender = imagezmq.ImageSender(connect_to="tcp://192.168.34.13:5555")
+        self.device_name = socket.gethostname()
+        self.camera = None
+    
+    def initialize_processes(self):
+        """
+        Initializes and starts all threads for the application's operations.
+        """
+        print("[Main] Starting process initialization...")
+
+        # Establish connections with the Bluetooth and serial devices
+        self.serial_api.connect()
+        self.bluetooth_api.connect()
+
+        # Send a test image frame to ensure the image server connection is working
+        self.send_test_frame()
+
+        # Set up threading for Bluetooth and image processing
+        self.bluetooth_thread = threading.Thread(target=self.read_bluetooth_messages)
+        self.image_thread = threading.Thread(target=self.capture_and_process_images)
+
+        self.bluetooth_thread.start()
+        self.image_thread.start()
+        print("[Main] Processes initialized successfully.")
+
+        self.bluetooth_thread.join()
+        self.image_thread.join()
+    
+    def send_test_frame(self):
+        """
+        Captures a single image frame and sends it to the image server as a connection test.
+        """
+        camera = PiCamera()
+        camera.resolution = (1280,720)
+        frame_buffer = PiRGBArray(camera)
+        camera.capture(frame_buffer, 'bgr')
+        test_image = frame_buffer.array
+        print("[Image] Sending test image to server...")
+        test_result = self.image_sender.send_image(self.device_name, test_image)
+        print("[Image] Received test result:", test_result)
+        camera.close()
+
+    def capture_and_process_images(self):
+        """
+        Captures images continuously and sends them to the image server for processing.
+        Handles the image processing results and controls the STM device accordingly.
+        """
+        global is_capture_enabled, is_running, has_started, is_setup_needed, image_capture_count
+        try:
+            if is_setup_needed:
+                self.camera = PiCamera()
+                self.camera.resolution = (1280,720)
+                self.camera.awb_mode = 'auto'
+                self.camera.exposure_mode = 'backlight'
+                print("[Image] Camera activated.")
+                self.camera.start_preview()
+                is_setup_needed = False
+            
+            while not has_started and is_capture_enabled:
+                print("[Image] Capturing...")
+                frame_buffer = PiRGBArray(self.camera)
+                self.camera.capture(frame_buffer, 'bgr')
+                captured_image = frame_buffer.array
+
+                frame_buffer.truncate(0)
+                print("[Image] Image captured, sending for processing...")
+
+                # Signal to STM
+                stm_signal = "S" if image_capture_count == 0 else "D"
+                self.serial_api.write(stm_signal.encode('utf-8'))
+                image_capture_count += 1
+
+                print(f"[STM] Signal '{stm_signal}' sent to STM.")
+                processing_result = self.image_sender.send_image(self.device_name, captured_image).decode('utf-8')
+                print(f"[Server] Received processing result: {processing_result}")
+
+                if processing_result in ['38', '39']:
+                    is_capture_enabled = False
+                    return processing_result
+                else:
+                    print("[Image] Direction not deteced, retrying...")
+        
+        except Exception as error:
+            print("[Error] Failed to process image:", error)
+
+
+    def read_bluetooth_messages(self):
+        """
+        Monitors Bluetooth for incoming messages and triggers actions based on those messages.
+        """
+        global is_capture_enabled, is_running, has_started
+        while has_started:
+            message = self.bluetooth_api.read()
+            if message:
+                print(f"[Bluetooth] Received: {message}")
+                # Process the message here and trigger corresponding actions
+                try:
+                    if b'sp' in message:
+                        is_capture_enabled = True
+                        print("[Main] Initializing image capture...")
+                        direction = self.capture_and_process_images()
+
+                        if direction == '38':
+                            self.serial_api.write(b'R')
+                            print("[STM] Command 'R' sent.")
+                        elif direction == '39':
+                            self.serial_api.write(b'L')
+                            print("[STM] Command 'L' sent.")
+
+                        # Await STM acknowledgment
+                        ack = self.await_stm_ack()
+                        if ack and direction in ['38', '39']:
+                            is_capture_enabled = True
+                            self.capture_and_process_images()
+                except Exception as e:
+                    print("[Error] Invalid Bluetooth message:", e)
+        exit()
+    
+    def await_stm_ack(self):
+        """
+        Waits for and returns True if an 'A' acknowledgment is received from the STM device, otherwise False.
+        """
+        ack = None
+        while not ack:
+            ack = self.serial_api.read()
+            if ack and b'A' in ack:
+                print("[STM] Acknowledgment received.")
+                return True
+        return False
+
+    def clean_up(self):
+        """
+        Cleans up resources, such as GPIO and camera, before exiting the program.
+        """
+        GPIO.cleanup()
+        if self.camera:
+            self.camera.close()
+
+if __name__ == "__main__":
+    is_capture_enabled = False
+    is_running = True
+    has_started = True
+    is_setup_needed = True
+    image_capture_count = 0
+    
+    multithreader = Multithreader()
+    atexit.register(multithreader.clean_up)
+    multithreader.initialize_processes()

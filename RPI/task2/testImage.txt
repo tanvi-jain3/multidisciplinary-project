@@ -1,0 +1,51 @@
+import time
+import socket
+from picamera import PiCamera
+from picamera.array import PiRGBArray
+import imagezmq
+
+# Configuration settings
+HOST = '192.168.34.13'  # Server IP
+PORT = '5555'
+MAX_COUNT = 2  # Maximum number of detections
+
+# Initialize the camera and image sender
+camera = PiCamera()
+camera.resolution = (1280, 720)
+image_sender = imagezmq.ImageSender(connect_to=f"tcp://{HOST}:{PORT}")
+device_name = socket.gethostname()
+
+# Camera warm-up time
+print("[Image] Warming up camera...")
+camera.start_preview()
+time.sleep(2)
+
+# Image capture and processing loop
+detection_count = 0
+while detection_count < MAX_COUNT:
+    # Capture an image
+    with PiRGBArray(camera) as stream:
+        camera.capture(stream, format='bgr')
+        image = stream.array  # Convert the image to a NumPy array
+
+    # Send the image to the server for processing
+    print("[Image] Sending image for processing...")
+    processing_start_time = time.time()
+    result = image_sender.send_image(device_name, image)
+    processing_end_time = time.time()
+
+    print(f"[Image] Image processed. Time taken: {processing_end_time - processing_start_time:.2f} seconds")
+
+    # Process the server's response
+    if b'38' in result:
+        print("[Result] Detected direction: Right")
+        detection_count += 1
+    elif b'39' in result:
+        print("[Result] Detected direction: Left")
+        detection_count += 1
+    else:
+        print("[Result] No relevant detection.")
+
+# Cleanup after processing loop
+camera.stop_preview()
+print("[Image] Camera stopped. Processing completed.")

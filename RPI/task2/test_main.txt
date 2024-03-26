@@ -1,0 +1,77 @@
+import time
+import RPi.GPIO as GPIO
+from picamera import PiCamera
+from picamera.array import PiRGBArray
+from bluetoothapi import BluetoothAPI
+from serialapi import SerialAPI
+import imagezmq
+import socket
+
+class ImageProcessingRobot:
+    def __init__(self):
+        self.bluetooth_api = BluetoothAPI()
+        self.serial_api = SerialAPI()
+        self.camera = PiCamera()
+        self.camera.resolution = (1280, 720)
+        self.camera.awb_mode = 'auto'
+        self.camera.exposure_mode = 'backlight'
+        self.sender = imagezmq.ImageSender(connect_to="tcp://192.168.34.13:5555")
+        self.device_name = socket.gethostname()
+        self.obstacle_count = 2
+
+    def configure_camera(self):
+        print("[Image] Starting camera")
+        self.camera.start_preview()
+
+    def capture_and_send_image(self):
+        with PiRGBArray(self.camera) as output:
+            self.camera.capture(output, 'bgr')
+            image = output.array
+            print("[Image] Image captured, sending for processing...")
+            result = self.sender.send_image(self.device_name, image).decode('utf-8')
+            return result
+
+    def process_images_until_detection(self):
+        while self.obstacle_count > 0:
+            result = self.capture_and_send_image()
+            if result in ['38', '39']:
+                direction = 'R' if result == '38' else 'L'
+                print(f"[Main] Detected direction: {direction}. Sending command to STM.")
+                self.serial_api.write(direction.encode("utf-8"))
+                self.wait_for_ack_from_stm()
+                self.obstacle_count -= 1
+
+    def wait_for_ack_from_stm(self):
+        ack = None
+        while not ack:
+            ack = self.serial_api.read()
+            if ack:
+                print(f"[Main] Received acknowledgment from STM: {ack}")
+
+    def listen_for_start_command(self):
+        print("[Main] Waiting for start command from Bluetooth...")
+        message = self.bluetooth_api.read()
+        if message and 'start' in message.decode('utf-8').lower():
+            print("[Main] Start command received.")
+            self.serial_api.write(b'S')
+        else:
+            print("[Main] Invalid start command. Exiting...")
+            exit()
+
+    def close_resources(self):
+        print("[Main] Cleaning up resources.")
+        GPIO.cleanup()
+        self.camera.close()
+
+    def run(self):
+        self.configure_camera()
+        self.bluetooth_api.connect()
+        self.serial_api.connect()
+        self.listen_for_start_command()
+        self.process_images_until_detection()
+        self.close_resources()
+        print("[Main] Task completed successfully.")
+
+if __name__ == "__main__":
+    robot = ImageProcessingRobot()
+    robot.run()

@@ -1,0 +1,76 @@
+import serial
+import time
+
+class SerialAPI:
+    # Constants for serial port configuration
+    SERIAL_PORT = '/dev/ttyUSB0'  # The serial port to connect to
+    BAUD_RATE = 115200  # The baud rate for serial communication
+
+    def __init__(self):
+        # Initialize the serial connection attribute
+        self.serial_connection = None
+
+    def check_connection(self):
+        # Check if the serial connection is not established
+        return self.serial_connection is None
+
+    def connect(self):
+        # Attempt to establish a serial connection in a loop
+        while True:
+            try:
+                print("[STM] Attempting to connect...")
+                # Create a serial connection with the specified port and baud rate
+                self.serial_connection = serial.Serial(self.SERIAL_PORT, self.BAUD_RATE)
+            except Exception as exception:
+                # If connection fails, print the error and retry after 1 second
+                print("[STM] Connection failed:", exception)
+                time.sleep(1)
+            else:
+                # If connection is successful, break the loop
+                print("[STM] Connected successfully")
+                break
+
+    def write(self, message):
+        # Send a message through the serial connection
+        print("[STM] Sending message to STM:", message)
+        try:
+            # Write the message to the serial port
+            self.serial_connection.write(message)
+        except Exception as exception:
+            # Print an error message if the send operation fails
+            print("[STM] Failed to send:", exception)
+
+    def read(self):
+        # Read a message from the serial connection
+        print("\n[STM] Reading from STM...")
+        message = None
+        try:
+            # Read from the serial port until the 'A' delimiter is found
+            message = self.serial_connection.read_until(b'A')
+        except Exception as exception:
+            # Print an error message if the read operation fails
+            print("[STM] Failed to read:", exception)
+        else:
+            # If a message is received, print and return it
+            if message:
+                print("[STM] Message read:", message)
+                return message
+
+# Main program execution
+if __name__ == '__main__':
+    serialapi = SerialAPI()  # Instantiate the SerialAPI class
+    serialapi.connect()  # Try to establish a serial connection
+
+    # Continuously process user input
+    while True:
+        command = input("Enter Command: ")
+        if command == "close":
+            # Close the serial connection and exit the program if 'close' is entered
+            print("Closing Serial Connection")
+            serialapi.serial_connection.close()
+            exit()
+        else:
+            # For other commands, encode the string and send it via serial
+            encoded_command = command.encode()
+            serialapi.write(encoded_command)
+            print("Sent:", encoded_command)
