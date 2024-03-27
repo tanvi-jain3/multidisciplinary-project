@@ -1,0 +1,90 @@
+import socket
+import time
+
+class IPSocketAPI:
+    READ_BUFFER_SIZE = 2048  
+
+    
+    def __init__(self):
+        self.server = None 
+        self.client = None       
+              
+        self.client_address = None  
+
+    
+    def check_connection(self):
+        return self.server is None or self.client is None
+
+    
+    def connect(self):
+        
+        while True:
+            print("[Algorithm] Connecting to Algorithm...")
+            try:
+                
+                self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                
+                self.server.setsockopt(
+                    socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                
+                self.server.bind(('192.168.1.1', 6000))
+                
+                self.server.listen()
+                print("[Algorithm] Listening for algo...")
+                
+                self.client, self.client_address = self.server.accept()
+                print("[Algorithm] Connected to algo  "+str(self.client_address))
+            except Exception as exception:  
+                print("[Algorithm] Connection failed: " + str(exception))
+                time.sleep(3)  
+            else:  
+                print("[Algorithm] connection success")
+                print("[Algorithm] Client address is " +
+                      str(self.client_address))
+                break  
+
+    
+    def write(self, message):
+        print("[Algorithm] Sending message:")
+        print(message)
+        try:
+            self.client.send(message)  
+        except Exception as exception: 
+            print("[Algorithm] Failed to send: " + str(exception))
+
+    
+    def read(self):
+        print("")
+        print("[Algorithm] Reading message from Algorithm...")
+        try:
+            
+            message = self.client.recv(self.READ_BUFFER_SIZE)
+        except Exception as exception: 
+            print("[Algorithm] Failed to read due to Exception: " + str(exception))
+        else:
+            if message is not None and len(message) > 0:
+                print("[Algorithm] Message read:", message)
+                return message  
+
+
+if __name__ == '__main__':
+    ipsocketapi = IPSocketAPI()  
+    try:
+        ipsocketapi.server.close()  
+    except:
+        print("[Algorithm] Not Connected")  
+    ipsocketapi.connect()  
+
+    
+    message = ""
+    ipsocketapi.write(message.encode('utf-8'))  
+    while True:
+        msg = input("Enter IP command (R/write):")  
+        if msg == 'R':  
+            algo = ipsocketapi.read()  
+            n = 5
+          
+            instruction = [algo[i:i+n] for i in range(0, len(algo), n)]
+            print(instruction)
+        else:
+            ipsocketapi.write(msg.encode('utf-8')) 

@@ -1,0 +1,382 @@
+import multiprocessing
+import time
+import threading
+
+from bluetoothapi import BluetoothAPI
+from ipsocketapi import IPSocketAPI
+from serialapi import SerialAPI
+from imageapi import ImageAPI
+import RPi.GPIO as GPIO
+import atexit
+import queue
+
+
+
+class MultithreaderClass:
+
+    def __init__(self):
+        """
+        init the connection classes 
+        """
+        self.serialapi = SerialAPI()
+        self.imageClientapi = ImageAPI()
+        self.write_message_queue = multiprocessing.Queue()
+        self.bluetoothapi = BluetoothAPI()
+        self.ipsocketapi = IPSocketAPI()
+        
+        self.obstacle_ID = None
+
+
+    def init_processes(self):
+        """
+        init the processes for communication. "Join" will integrate all queues 
+        """
+        global takePicture
+        global imageQueue
+        print("[RPI] Attempting to initialize multithreader...")
+        self.serialapi.connect()
+        
+        self.ipsocketapi.connect()
+        self.bluetoothapi.connect()
+
+        
+        self.read_bluetooth_process = threading.Thread(
+            target=self.read_bluetooth)
+        self.read_ipsocket_process = threading.Thread(
+            target=self.read_ipsocket)
+        self.read_image_process = threading.Thread(target=self.takePic)
+        self.write_process = threading.Thread(target=self.write)
+        self.handleIQ_process = threading.Thread(target=self.handleImageQueue)
+
+        self.read_ipsocket_process.start()
+        self.read_bluetooth_process.start()
+        self.read_image_process.start()
+        self.write_process.start()
+        self.handleIQ_process.start()
+        print("[RPI] Initialized multithreader successfully.")
+
+        self.read_ipsocket_process.join()
+        self.read_bluetooth_process.join()
+        self.read_image_process.join()
+        self.write_process.join()
+        self.handleIQ_process.join()
+
+    def takePic(self):
+        """
+        Takes image and adds it to image queue for processing 
+        """
+        global Running
+        global takePicture
+        global imageQueue
+
+        while Running:
+            if takePicture == True:
+                obstacle_ID = self.obstacle_ID
+                print(f"[Image] Taking the picture for {obstacle_ID}")
+                takenPicture = self.imageClientapi.rpiTakePicture()
+                print(
+                    f"[Image] Successfully cpatured photo for {obstacle_ID}")
+                
+                imageQueue.put([takenPicture, obstacle_ID])
+                takePicture = False
+    def readSTMTimeout(self, timeout_event):
+            global STMAckRec
+            ack = None
+            while ack is None and not timeout_event.is_set():
+                ack = self.serialapi.read()
+                if ack and b'A' in ack:
+                    STMAckRec = True
+                    return
+                time.sleep(0.1) 
+
+    
+    def disconnectAll(self):
+        """
+        disconnect all connections and close the camera
+        """
+        global recImages
+        global numofObstacle
+        while True:
+            if len(recImages) == numofObstacle:
+                time.sleep(5)
+                
+                print("[Image] Closing camera")
+                self.imageClientapi.imageClose()
+                print("[RPI] Disconnecting from IP Socket")
+                self.ipsocketapi.server.close()
+                print("[RPI] Disconnecting from BT")
+                self.bluetoothapi.server.shutdown(2)
+                self.bluetoothapi.server.close()
+                running = False
+                exit()
+            break
+        return
+
+    
+    def handleImageQueue(self):
+        """
+        processes images from a queue, sends  to  server for
+        recognition and handles the results 
+        """
+        global obstacleCounter
+        global recImages
+        global Running
+        while Running:
+            if not imageQueue.empty():
+                
+                currentQ = imageQueue.get()
+                takenPicture = currentQ[0]
+                obstacle_ID = currentQ[1]
+                count = 0
+                print("[RPI] Sending Image to server")
+                image_id = self.imageClientapi.sendImage(
+                    takenPicture)
+                image_id = str(image_id)
+                print("[RPI] Image ID received from server:", image_id)
+                iMsg = image_id.encode('utf-8')
+                obs = str(obstacle_ID)
+                try:
+                    
+                    if (image_id == 'N'):
+                        print("[RPI] Print image recognition result")
+                        iError = (image_id+obs).encode('utf-8')
+                        print(iError)
+                        
+                    
+                    elif (image_id != '99' and image_id != 'N'):
+                        print("[BT] Sending the image results to android")
+                        bMsg = "TARGET,"+obs+","+str(image_id)
+                        print("[BT] Message sent to android:", bMsg)
+                        
+                        self.bluetoothapi.write(bMsg)
+                        
+                        recImages.append(image_id)
+                        obstacleCounter -= 1
+                        print(
+                            f"[RPI] Number of obstacles left {obstacleCounter}")
+                
+                    else:
+                        print("[RPI] Bullseye")
+                      
+                        recImages.append(image_id)
+                        obstacleCounter -= 1
+                        print(
+                            f"[RPI] Number of obstacles left {obstacleCounter}")
+                except Exception as mistake:
+                    print("[RPI] Image recognition error:", mistake)
+
+    
+    def read_bluetooth(self):
+        """
+        The function `read_bluetooth` reads messages from a BT connection and performs different
+        actions based on the received messages.
+        """
+        global obstacleCounter
+        global numofObstacle
+        global Running
+        global bluetoothOn
+        global firstTime
+        if self.bluetoothapi.check_connection is None:
+            self.reconnect_android()
+        while Running and bluetoothOn:
+            message = self.bluetoothapi.read()
+            if message is not None and len(message) > 0:
+                print("[RPI] Message received from bluetooth", message)
+                try:
+                    if b'START' in message:
+                        firstTime = False
+                        print("[RPI] Starting to dequeue")
+                        self.write()
+
+                    elif b'ALG' in message:
+                        obstacles = message.decode('utf-8').split(';')
+                        x = 0
+                        while x < len(obstacles):
+                            if len(obstacles[x]) < 4:
+                                obstacles.remove(obstacles[x])
+                            else:
+                                x += 1
+                        
+                        filteredObstacles = ";".join(obstacles)
+                        filteredObstacles = filteredObstacles+";"
+                        numofObstacle = len(obstacles)
+                        obstacleCounter = len(obstacles)
+                        print(
+                            "Sending filtered obstacles directly to algo:" + filteredObstacles)
+                        self.ipsocketapi.write(
+                            filteredObstacles.encode('utf-8'))
+                except Exception as exception:
+                    print("[ERROR] Invalid message from bluetooth")
+                    print(str(exception))
+
+    def read_ipsocket(self):
+        """
+        The function `read_ipsocket` reads messages from an IP socket, processes them, and adds them to
+        a message queue for further processing.
+        """
+        global Running
+        
+        while Running and firstTime:
+            message = self.ipsocketapi.read()
+            if message is not None and len(message) > 0:
+                n = 5
+                instr = [message[i:i+n] for i in range(0, len(message), n)]
+                for r in instr:
+                    
+                    if b'P' in r:
+                        image_message = self.convert_to_dict('P', r)
+                    
+                        self.write_message_queue.put(image_message)
+                    
+                    else:
+                        print("[RPI] Queueing message to be sent to STM:", r)
+                        stm_message = self.convert_to_dict('S', r)
+                        self.write_message_queue.put(stm_message)
+                        androidToSend = "COMMAND," + (r.decode('utf-8'))
+                        androidToSend = androidToSend.encode('utf-8')
+                        and_message = self.convert_to_dict('B', androidToSend)
+                        self.write_message_queue.put(and_message)
+                print(
+                    f"[RPI] Queue to send: {self.write_message_queue}")
+            else:
+                print("[RPI] Invalid command", message, "read from Algo")
+
+    
+    def reconnect_android(self):
+        """
+        Used to reconnect android bluetooth and start the read/write services 
+        """
+        print("[RPI] Attempting to reconnect")
+        self.bluetoothapi.disconnect()
+
+        global writeOn
+        global bluetoothOn
+        writeOn = False
+        bluetoothOn = False
+
+        self.bluetoothapi.connect()
+        print("[BT] BT successfully reconnected")
+
+        writeOn = True
+        bluetoothOn = True
+
+        
+        self.read_android_process = threading.Thread(
+            target=self.read_bluetooth)
+        self.read_android_process.start()
+        self.read_android_process.join()
+        self.write_process = threading.Thread(target=self.write)
+        self.write_process.start()
+        self.write_process.join()
+
+        print("Reconnected to android...")
+
+    
+    def write(self):
+        """
+        The `write` function is responsible for sending messages to different devices based on their
+        headers.`
+        """
+        global Running
+        global writeOn
+        global firstTime
+        global takePicture
+        global STMAckRec
+        while Running and writeOn and firstTime == False:
+            try:
+                if self.write_message_queue.empty():
+                    print('[RPI] Write queue is empty')
+                    break
+                    
+                if takePicture == False:
+                    message = self.write_message_queue.get()
+                    print("[RPI] Message to send: ", message)
+                    header = message["header"]
+                    body = message["body"]
+                    if header == "B":  
+                        print("[RPI] Sending ", body, " to Android")
+                        failed = self.bluetoothapi.write(body)
+                        if failed:
+                            print("[BT] Attempting to reconnect bluetooth")
+                            self.reconnect_android(self)
+
+                    elif header == "I":  
+                        print("[RPI] Sending", body, "to IpSocket")
+                        self.ipsocketapi.write(body)
+
+                    elif header == "P":  
+                        obstacle_ID = int(body[-1])-48
+                        print("[RPI] Obstacle ID:", str(obstacle_ID))
+                        self.obstacle_ID = obstacle_ID
+                        takePicture = True
+                        print("[RPI] Going to take picture for " + str(obstacle_ID))
+                        
+                        serialmsg= ("PXXX"+str(obstacle_ID)).encode('utf-8')
+                        self.serialapi.write(serialmsg)
+                        ack = None
+                        while ack is None:
+                            ack = self.serialapi.read()
+                            print("[RPI] Received from STM", ack)
+                            if  b'A' not in ack:
+                                ack = None
+
+                    elif header == "S":  
+                        print(f"[RPI] STM processing started with {body}")
+                        try:
+                            print("[RPI] Sending ", body, " to STM")
+                            self.serialapi.write(body)
+
+                            
+                            STMAckRec = False
+                            timeout_event = threading.Event()
+
+                            
+                            stm_thread = threading.Thread(target=self.readSTMTimeout, args=(timeout_event,))
+                            stm_thread.start()
+                            stm_thread.join(timeout=10) 
+
+                            
+                            if not STMAckRec:
+                                timeout_event.set()
+                                stm_thread.join()  
+                                print("[RPI] STM did not respond in time. Proceeding to next command.")
+                        except Exception as wrong:
+                            
+                            print("[RPI] Error sending STM", body)
+                            print("[RPI] Error sending STM", wrong)
+
+                    else:
+                        print("[RPI] Invalid header " + str(header))
+
+                    print("[RPI] Message sent")
+            except Exception as exception:
+                print("[RPI] Error occurred in write: " + str(exception))
+                time.sleep(1)
+
+    
+    def convert_to_dict(self, header, body):
+        return {"header": header, "body": body}
+
+    
+    def clean_up(self):
+        GPIO.cleanup()
+
+
+if __name__ == "__main__":
+    
+    takePicture = False
+    imageQueue = queue.Queue(10)
+    obstacleCounter = None
+    numofObstacle = None
+    recImages = []
+    bluetoothOn = True
+    writeOn = True
+    Running = True
+    firstTime = True
+    STMAckRec = False
+    
+    mt = MultithreaderClass
+
+    time.sleep(2)
+
+    mt.init_processes()
