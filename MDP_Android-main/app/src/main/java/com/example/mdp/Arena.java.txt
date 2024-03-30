@@ -37,7 +37,7 @@ public class Arena extends AppCompatActivity {
     private static final String TAG = "Arena->DEBUG";
     public static boolean firstStart = true;
 
-    public void saveData() {
+    public void savesdata() {
         SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
 
@@ -86,7 +86,7 @@ public class Arena extends AppCompatActivity {
         editor.apply();
     }
 
-    public void loadData() {
+    public void loaddata() {
         SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
         obstacle1.setX(sharedPreferences.getFloat("obs1X", 0.0f));
         obstacle1.setY(sharedPreferences.getFloat("obs1Y", 0.0f));
@@ -140,7 +140,7 @@ public class Arena extends AppCompatActivity {
     private final int INITIAL_X = 1 * SNAP_GRID_INTERVAL - SNAP_GRID_INTERVAL;
     private final int INITIAL_Y = 18 * SNAP_GRID_INTERVAL - SNAP_GRID_INTERVAL;
 
-    private boolean canSetObstacles = false;
+    private boolean cansetobstacles = false;
     private String curMode = "IDLE";
 
     Button IRButton, SPButton, resetButton, preset1Button, setButton, timerButton, saveButton;
@@ -150,14 +150,14 @@ public class Arena extends AppCompatActivity {
     Map<Integer, ImageView> obstacles;
 
     // RecyclerView
-    ArrayList<String> s1 = new ArrayList<String>();
-    ArrayList<Integer> images = new ArrayList<Integer>();
-    RecyclerView recyclerView;
+    //ArrayList<String> s1 = new ArrayList<String>();
+    //ArrayList<Integer> images = new ArrayList<Integer>();
+    //RecyclerView recyclerView;
 
     protected void onPause() {
         super.onPause();
         Log.d("onpause", "OnPause() called");
-        saveData();
+        savesdata();
     }
 
     @Override
@@ -171,22 +171,22 @@ public class Arena extends AppCompatActivity {
         // start listening for incoming messages
         LocalBroadcastManager.getInstance(this).registerReceiver(myReceiver, new IntentFilter("incomingMessage"));
 
-        initObstacles();
-        initButtons();
-        initMovementButtons();
+        initialiseObstacles();
+        initialiseButtons();
+        initialiseMovementButtons();
 
         if (!firstStart) {
-            loadData();
+            loaddata();
         } else {
             firstStart = false;
-            saveData();
+            savesdata();
         }
     }
 
     /**
      * Initializes obstacles and setup listeners
      */
-    private void initObstacles() {
+    private void initialiseObstacles() {
         obstacle1 = findViewById(R.id.obstacle1);
         obstacle2 = findViewById(R.id.obstacle2);
         obstacle3 = findViewById(R.id.obstacle3);
@@ -370,7 +370,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -413,7 +413,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -456,7 +456,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -499,7 +499,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -542,7 +542,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -585,7 +585,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -628,7 +628,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -671,7 +671,7 @@ public class Arena extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (!canSetObstacles) {
+                if (!cansetobstacles) {
                     return false;
                 }
                 switch (event.getAction()) {
@@ -709,7 +709,7 @@ public class Arena extends AppCompatActivity {
     /*
      * Set obstacle ID images
      */
-    private void setObstacleImage(int obstacleNumber, String image) {
+    private void setObstacleImageID(int obstacleNumber, String image) {
         int orientation = (int) obstacles.get(obstacleNumber).getRotation();
         ImageView iv = obstacles.get(obstacleNumber);
         Log.d("Obstacle ID", String.valueOf(iv.getId()));
@@ -735,7 +735,7 @@ public class Arena extends AppCompatActivity {
     /*
      * Initializes the arrow buttons
      */
-    private void initMovementButtons() {
+    private void initialiseMovementButtons() {
         ImageButton forwardButton = (ImageButton) findViewById(R.id.forwardButton);
         forwardButton.setOnClickListener(v -> {
              Log.d(TAG, "forward");
@@ -748,7 +748,7 @@ public class Arena extends AppCompatActivity {
             }
 
             // Animation
-            forwardButtonCommand(1);
+            forwardButton(1);
         });
 
         ImageButton reverseButton = (ImageButton) findViewById(R.id.reverseButton);
@@ -763,7 +763,7 @@ public class Arena extends AppCompatActivity {
             }
 
             // Animation
-            reverseButtonCommand(1);
+            reverseButton(1);
         });
 
         ImageButton leftButton = (ImageButton) findViewById(R.id.leftButton);
@@ -796,7 +796,7 @@ public class Arena extends AppCompatActivity {
     /**
      * Initalizes buttons, car and setup listeners
      */
-    private void initButtons() {
+    private void initialiseButtons() {
         // Declarations
         car = findViewById(R.id.car);
         car_x = findViewById(R.id.x_tv);
@@ -847,7 +847,7 @@ public class Arena extends AppCompatActivity {
      * ======================
      */
 
-    private void forwardButtonCommand(int noOfGrids) {
+    private void forwardButton(int noOfGrids) {
         int orientation = (int) car.getRotation();
         int new_x, new_y;
         ObjectAnimator animator;
@@ -890,7 +890,7 @@ public class Arena extends AppCompatActivity {
         }
     }
 
-    private void reverseButtonCommand(int noOfGrids) {
+    private void reverseButton(int noOfGrids) {
         int orientation = (int) car.getRotation();
         int new_x, new_y;
         ObjectAnimator animator;
@@ -2246,7 +2246,7 @@ public class Arena extends AppCompatActivity {
     }
 
     private void toggleSetMode() {
-        canSetObstacles = !canSetObstacles;
+        cansetobstacles = !cansetobstacles;
         if (curMode.equals("IDLE")) {
             curMode = "SET";
             setButton.setText("Done");
@@ -2523,7 +2523,7 @@ public class Arena extends AppCompatActivity {
                             Toast.makeText(Arena.this, "Image not recognized, trying again", Toast.LENGTH_SHORT).show();
                         } else {
                             // RMB TO PLUS 1 !!
-                            setObstacleImage(obstacleNumber + 1, solution);
+                            setObstacleImageID(obstacleNumber + 1, solution);
                             Toast.makeText(Arena.this,
                                     "Obstacle " + obstacleNumber + " changed to Target ID: " + solution,
                                     Toast.LENGTH_SHORT).show();
@@ -2571,12 +2571,12 @@ public class Arena extends AppCompatActivity {
                             case "SF":
                                 convertedDistance = Integer.parseInt(distance) / 10;
                                 Log.d(TAG, prefix + ";" + convertedDistance);
-                                forwardButtonCommand(convertedDistance);
+                                forwardButton(convertedDistance);
                                 break;
                             // reverseA
                             case "SB":
                                 convertedDistance = Integer.parseInt(distance) / 10;
-                                reverseButtonCommand(convertedDistance);
+                                reverseButton(convertedDistance);
                                 break;
                             // right forward
                             case "RF":
